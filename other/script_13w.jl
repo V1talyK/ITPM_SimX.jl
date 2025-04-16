@@ -1,7 +1,9 @@
 using ITPM_SimX
 using Plots, SimScriptTool, UnicodePlots
+using plotlibs
+
 tag = "13w"
-grd, gdm_prop, prp, x, nt = make_gdm(;he_init = 10.,
+grd, gdm_prop, prp, xy, nt = make_gdm(;he_init = 10.,
                                      kp_init = 100,
                                      mp_init = 0.2,
                                      nt_init = 240,
@@ -13,8 +15,9 @@ grd, gdm_prop, prp, x, nt = make_gdm(;he_init = 10.,
                                      Paq = 10,
                                      λb = 0.25)
 
-x = ITPM_SimX.make_well_grid(grd, 0.25, 5)
-wxy13 = collect(zip(1:13,collect(Iterators.product(x,x))[1:2:25]))
+x = make_well_grid(2500, 0.25, 5)
+y = make_well_grid(2500, 0.25, 5)
+wxy13 = collect(zip(1:13,collect(Iterators.product(x,y))[1:2:25]))
 well = make_well(wxy13,grd)
 nw = length(unique(getindex.(well,2)))
 iw_inj = [4,5,9,10]
@@ -96,7 +99,7 @@ while flag
 end
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 
-sum(rsl.qw[rsl.qw.>0])*30.4./(2500*2500*10*0.2)
+sum(rsl.qw[rsl.qw.>0])*30.4./(sum(grd.Sp)*10*0.2)
 iw =1
   plt = plot(rsl.pw[iw,:], lw = 2, label = "заб.")
   plot!(plt, rsl.ppl[iw,:], lw = 2, label = "яч.")
@@ -126,9 +129,14 @@ end
 display(plt)
 display(plt2)
 
-plt = plot_map_and_well(range(0, 2500, grd.nx),
-                  range(0, 2500, grd.ny),
-                  reshape(rsl.PM[:,end], grd.nx, grd.ny)', wxy, [iw_prod, iw_inj], ["Доб.", "Наг."],
+nx_init = 51,
+ny_init = 51,
+Lx_init = 2500,
+Ly_init = 2500,
+
+plt = plot_map_and_well(range(0, Lx_init, nx_init),
+                  range(0, Ly_init, ny_init),
+                  reshape(rsl.PM[:,end], nx_init, ny_init)', wxy, [iw_prod, iw_inj], ["Доб.", "Наг."],
                   [:circle, :dtriangle])
 Plots.annotate!(plt, getindex.(wxy,1).+120, getindex.(wxy,2).-50, text.(string.("№", 1:nw),12))
 #

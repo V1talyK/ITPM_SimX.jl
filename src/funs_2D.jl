@@ -340,10 +340,21 @@ function make_grid(nx,ny,Lx,Ly)
      Y = getindex.(XY,2)
      rc = make_rc(nx,ny);
 
+     dx = view(X,view(rc,:,1)).-view(X,view(rc,:,2))
+     dy = view(Y,view(rc,:,1)).-view(Y,view(rc,:,2))
+     dl = sqrt.(dx.^2 + dy.^2);
+    
+     ds = zeros(Float32, length(dl))
+     ds[dx.==0] .= step(xr)
+     ds[dy.==0] .= step(yr)
+
+     Sp = zeros(Float32, nc)
+     Sp .= step(xr)*step(yr)
+
      irc = findall(.|(rc[:,1].<=nx,rc[:,1].>nx*(ny-1),mod.(rc[:,1],nx).==1,mod.(rc[:,1],ny).==0))
      λbi = sort(unique(rc[irc,1]))
 
-     return (nc = nc, nx = nx, ny = ny, dx=dx, ds=ds, X = X, Y=Y, rc = rc, λbi=λbi)
+     return (nc = nc, dl=dl, ds=ds, Sp = Sp, X = X, Y=Y, rc = rc, λbi=λbi)
 end
 
 function make_rc(nx,ny)
@@ -372,19 +383,20 @@ function make_gdm(;he_init = 1.,
     grd = make_grid(nx,ny,Lx,Ly); #кол-во ячеек x, кол-во ячеек y, размер X, размер Y
     gdm_p = make_gdm_prop(bet0 = bet, Paq0 = Paq, λb0 = λb)
 
-    kp = kp_init*ones(grd.nx,grd.ny);   kp = kp[:];
-    he = he_init*ones(grd.nx,grd.ny);    he = he[:];
-    mp = mp_init*ones(grd.nx,grd.ny);    mp = mp[:];
+    kp = kp_init*ones(Float32, grd.nc);
+    he = he_init*ones(Float32, grd.nc);
+    mp = mp_init*ones(Float32, grd.nc);
 
     #Эффективный поровый объём ячеек (упругоёмкость)
-    eVp = gdm_p.bet.*he.*grd.ds.*grd.ds/gdm_p.dt;
+    eVp = gdm_p.bet.*he.*grd.Sp./gdm_p.dt;
     #Поровый объём ячеек
-    Vp = he.*grd.ds.*grd.ds.*mp
+    Vp = he.*grd.Sp.*mp
 
     prp = (kp = kp, he = he, mp = mp, eVp = eVp, Vp = Vp)
 
-    x = make_well_grid(grd, 0.2, 3)
-    return grd, gdm_p, prp, x, nt
+    x = make_well_grid(Lx, 0.2, 3)
+    y = make_well_grid(Ly, 0.2, 3)
+    return grd, gdm_p, prp, (x, y), nt
 end
 
 function make_gdmV(; he_init=1.0,
@@ -418,11 +430,11 @@ function make_gdmV(; he_init=1.0,
     return grd, gdm_p, prp, nt
 end
 
-function make_well_grid(grd, a = 0.25, ncol = 3)
+function make_well_grid(L, a = 0.25, ncol = 3)
     #a - отступ от края
     #ncol - кол-во рядов
     stp = (1 - a*2)/(ncol-1)
-    x = range(grd.dx*grd.nx*a; length=ncol, step = grd.dx*grd.nx*stp)
+    x = range(L*a; length=ncol, step = L*stp)
     return x
 end
 function make_well(wxy,grd)
