@@ -75,14 +75,14 @@ function make_sim(grd, gdm_prop, well, prp, nt)
         for t=1:nt
             if uuf
                 uft = view(uf, :, t)
-                updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp.*0)
+                updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp)
                 cholesky!(ACL, -A)
                 updateCL!(CL, ACL)
             end
 
             wct = view(wc, w2, t)
             bs.=0f0;
-            bs .= bs .- T.*λbc*Paq .- prp.eVp.*view(PM0, 1:nc)
+            bs .= bs .- T.*λbc*Paq .- prp.eVp.*view(PM0, 1:nc);
 
             PM[:,t], pwc[:,t], pplc[:,t], qwc[:,t] = sim_step!(PM0, qcl, CL, bb,
                             nc,nw,Paq,T,well,
@@ -527,9 +527,13 @@ function updA!(A,W1,AG,r,c,nx,nw,T,λb,w1,w2,GM, WI, wct, uft, eV=0)
     accumarray!(A2,r,AG)
     A2 .= A2 .+ T.*λb.+eV;
     WIg = WI.*view(GM,w1).*wct
-    A2[w1] .= A2[w1] .+ WIg
+    A2[w1] .= view(A2,w1) .+ WIg
     A2[w1[uft[w2]]] .= A2[w1[uft[w2]]] .+ WIg[uft[w2]]
+    #accumarray!(A3, w1[uft[w2]], A2[w1[uft[w2]]] .+ WIg[uft[w2]])
+    #A2.+=A3
+    #println(A[3700,:])
     updatesp!(A,1:nx,1:nx,.-A2)
+    #println(A[3700,:])
     accumarray!(W3, w2, WIg)
     updatesp!(A,nx+1:nx+nw,nx+1:nx+nw, -W3)
     updatesp!(A,w1,nx.+w2,WIg)

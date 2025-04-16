@@ -1,5 +1,6 @@
 using Plots, SimScriptTool
 using JLD2, FileIO
+using JSON, Dates
 rsrc = Base.source_dir()
 DD = load(joinpath(rsrc,"grd.jld2"))
 DD["XY"] = DD["XY"] .- minimum(DD["XY"],dims=1)
@@ -7,11 +8,10 @@ DD["XY"] = DD["XY"] .- minimum(DD["XY"],dims=1)
 grd, gdm_prop, prp, nt = make_gdmV(;he_init = 40.,
                                      kp_init = 100,
                                      mp_init = 0.2,
-                                     nt_init = 120,
+                                     nt_init = 119,
                                      DD = DD,
-                                     Paq = 8.6,
+                                     Paq = 11.8,
                                      bet = 1e-4,
-                                     Paq = 8,
                                      λb = 2.0)
 
 
@@ -23,18 +23,36 @@ sim_calc, cIWC = make_sim(grd,gdm_prop, well, prp, nt);
 qw = rand(-1:0.1:1, nw, nt);
 qw, _uf = SimScriptTool.gen_real_rand_qw(nw, nt; mult = 1.0)
 qw .= abs.(qw)
-qw[iw_inj,:] .*= -1
+qw[1:3:end,:] .*= -1
 qw = SimScriptTool.scaleRateByGeoProp(qw, prp.Vp, prp.kp, prp.he, gdm_prop.dt, gdm_prop.P0, grd.ds)
 
 pw = 2*ones(nw, nt);
 uf =  falses(nw, nt)
 
+tlb_in = JSON.parsefile("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/test/set2/tlb_in.json");
+tlb_wxy = JSON.parsefile("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/test/set2/tlb_wxy.json");
+obj = JSON.parsefile("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/test/set2/obj.json");
+
+_ppl, _pw, _qp, _qi, ht, wxy, uwi, udd, prm = getDataFromJSONs(tlb_wxy, tlb_in, obj);
+opra = ht./(daysinmonth.(udd).*24)';
+
+nt = length(udd)
+ia = indexin(uwi, DD["wi"])
+ib = filter(!isnothing, ia)
+qw = zeros(Float32, nw, nt);
+qi = zeros(Float32, nw, nt);
+qw .= _qp.v[ib,:]; qw[isnan.(qw)].=0.0
+qi .= _qi.v[ib,:]; qi[isnan.(qi)].=0.0
+qw .-= qi
+pw = _pw.v[ib,:];
+uf =  falses(nw, nt);
 
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 sum(rsl.qw[rsl.qw.>0])*30.4./sum(prp.Vp)
-iw = 4
-  plt = plot(rsl.ppl[iw,:])
-  plot!(plt, rsl.pw[iw,:])
+iw = 2
+  plt = Plots.plot(rsl.ppl[iw,:])
+  Plots.plot!(plt, rsl.pw[iw,:])
+  Plots.scatter!(plt, _ppl.v[iw,:])
 
 plot(rsl.qw[iw,:])
 qp = sum.(filter.(x->x>0, eachcol(rsl.qw)))
@@ -71,3 +89,12 @@ for iw = 1:nw
   end
 end
 write_to_csv(pth, tlb, ["well", "date", "pw, атм.", "prod, м3/сут.", "inj, м3/сут."])
+
+using GMT
+C = makecpt(range=(-10,20), cmap=:rainbow);
+GMT.contourf(hcat(grd.X, grd.Y, rsl.PM[:,end]), show = true, colorbar=true)
+#colorbar!(position=(inside=true, anchor=:BC), xaxis=(annot=:auto, ticks=:auto),
+ #         box=(pen=(0.25,:red),), ylabel="@.C", cmap=C, show = true)
+
+
+ Plots.scatter(_ppl.v, rsl.ppl)
