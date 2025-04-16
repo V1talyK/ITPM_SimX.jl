@@ -38,7 +38,7 @@ function make_sim(grd, gdm_prop, well, prp, nt)
     actW = trues(nw,nt)
     ufl = falses(nw,nt)
 
-    Rp= 0.14*sqrt.(2 .*grd.Sp[w1]);
+    Rp = 0.14*sqrt.(2 .*grd.Sp[w1]);
     WI = 2*pi./log.(Rp./0.05)
 
     A, W1 = makeA(view(rc,:,1),view(rc,:,2),nc,nw,w1,w2)
