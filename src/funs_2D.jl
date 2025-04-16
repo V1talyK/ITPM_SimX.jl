@@ -39,8 +39,8 @@ function make_sim(grd, gdm_prop, well, prp, nt)
     ufl = falses(nw,nt)
 
     Rp= 0.14*sqrt.(2 .*grd.Sp[w1]);
-
     WI = 2*pi./log.(Rp./0.05)
+
     A, W1 = makeA(view(rc,:,1),view(rc,:,2),nc,nw,w1,w2)
     AS = sparse(view(rc,:,1),view(rc,:,2),1.0,nc,nc)
     makeAG = make_fun_AG(grd.nc,grd.rc,grd.dl,grd.ds);
@@ -201,11 +201,12 @@ function make_sim2f(grd, gdm_prop, well, prp, nt, satc)
     tM = (M2M = sparse(w2,w1,dw,nw,nc),
           M2Mw = sparse(w1,w2,1,nc+nw,nw))
     actW = trues(nw,nt)
-    ufl = falses(nw,nt)
-
-    WI = 2*pi./fill(log(0.14*sqrt(2)*grd.dx/0.05),nwc)
+    
+    Rp= 0.14*sqrt.(2 .*grd.Sp[w1]);
+    WI = 2*pi./log.(Rp./0.05)
+    
     A, W1 = makeA(view(rc,:,1),view(rc,:,2),nc,nw,w1,w2)
-    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dx,grd.ds);
+    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dl,grd.ds);
 
     qw0 = zeros(Float32, nw, nt)
     pw0 = ones(Float32, nw, nt)

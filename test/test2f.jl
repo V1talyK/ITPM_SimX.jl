@@ -1,7 +1,7 @@
 @info "Тестирование прямого расчёта 2х фазного симулятора"
-grd, gdm_prop, prp, x, nt = make_gdm(kp_init = 0.5, he_init = 5, nt_init = 480)
+#grd, gdm_prop, prp, x, nt = make_gdm(kp_init = 0.5, he_init = 5, nt_init = 480)
 
-grd, gdm_prop, prp, x, nt = make_gdm(kp_init = 10,
+grd, gdm_prop, prp, xy, nt = make_gdm(kp_init = 10,
                                      he_init = 0.5,
                                      nt_init = 120,
                                      nx_init = 100,
@@ -11,7 +11,7 @@ grd, gdm_prop, prp, x, nt = make_gdm(kp_init = 10,
 
 gdm_sat = make_gdm_prop_sat(mu_o = 3f0)
 
-wxy9 = collect(Iterators.product(x,x))[:]
+wxy9 = collect(Iterators.product(xy[1],xy[2]))[:]
 well = make_well(wxy9,grd)
 nw = length(well)
 

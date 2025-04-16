@@ -1,11 +1,11 @@
 @info "Тестирование прямого расчёта симулятора, смена управлений на скважинах"
-grd, gdm_prop, prp, x, nt = make_gdm(kp_init = 10)
+grd, gdm_prop, prp, xy, nt = make_gdm(kp_init = 10)
 
-wxy9 = collect(Iterators.product(x,x))[:]
+wxy9 = collect(Iterators.product(xy[1],xy[2]))[:]
 well = make_well(wxy9,grd)
 nw = length(well)
 
-sim_calc, cIWC = make_sim(grd,gdm_prop, well, prp, nt)
+sim_calc, cIWC = make_sim(grd,gdm_prop, well, prp, nt);
 
 qw = rand(-1:0.1:1, nw, nt);
 qw[[1,3,7,9],:] .= -abs.(qw[[1,3,7,9],:]).-1;
