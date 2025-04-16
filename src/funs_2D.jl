@@ -416,14 +416,14 @@ function make_gdmV(; he_init=1.0,
   
     gdm_p = make_gdm_prop(bet0 = bet, Paq0 = Paq, λb0 = λb)
 
-    kp = kp_init*ones(Float32, grd_new.nc);
-    he = he_init*ones(Float32, grd_new.nc);
-    mp = mp_init*ones(Float32, grd_new.nc);
+    kp = kp_init*ones(Float32, grd.nc);
+    he = he_init*ones(Float32, grd.nc);
+    mp = mp_init*ones(Float32, grd.nc);
 
     #Эффективный поровый объём ячеек (упругоёмкость)
     eVp = gdm_p.bet.*he.*grd.Sp/gdm_p.dt;
     #Поровый объём ячеек
-    Vp = he.*grd_new.Sp.*mp
+    Vp = he.*grd.Sp.*mp
 
     prp = (kp = kp, he = he, mp = mp, eVp = eVp, Vp = Vp)
 
