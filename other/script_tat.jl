@@ -1,7 +1,12 @@
-using Plots, SimScriptTool
+using Plots, SimScriptTool, LinearAlgebra, SparseArrays, SuiteSparse, NearestNeighbors
 using JLD2, FileIO
 using JSON, Dates
 rsrc = Base.source_dir()
+
+include(joinpath(rsrc, "../src/funs_2D.jl"))
+include(joinpath(rsrc, "../src/libs.jl"))
+include(joinpath(rsrc, "../src/linAlgLib.jl"))
+
 DD = load(joinpath(rsrc,"grd.jld2"))
 DD["XY"] = DD["XY"] .- minimum(DD["XY"],dims=1)
 
@@ -32,7 +37,8 @@ uf =  falses(nw, nt)
 tlb_in = JSON.parsefile("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/test/set2/tlb_in.json");
 tlb_wxy = JSON.parsefile("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/test/set2/tlb_wxy.json");
 obj = JSON.parsefile("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/test/set2/obj.json");
-
+include("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/src/comlibs.jl")
+include("/home/lik/proto/RebResPress/RebuildReservoirPressure.jl/src/types.jl")
 _ppl, _pw, _qp, _qi, ht, wxy, uwi, udd, prm = getDataFromJSONs(tlb_wxy, tlb_in, obj);
 opra = ht./(daysinmonth.(udd).*24)';
 
