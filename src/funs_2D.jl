@@ -38,10 +38,12 @@ function make_sim(grd, gdm_prop, well, prp, nt)
     actW = trues(nw,nt)
     ufl = falses(nw,nt)
 
-    WI = 2*pi./fill(log(0.14*sqrt(2)*grd.dx/0.05),nwc)
+    Rp= 0.14*sqrt.(2 .*grd.Sp[w1]);
+
+    WI = 2*pi./log.(Rp./0.05)
     A, W1 = makeA(view(rc,:,1),view(rc,:,2),nc,nw,w1,w2)
     AS = sparse(view(rc,:,1),view(rc,:,2),1.0,nc,nc)
-    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dx,grd.ds);
+    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dl,grd.ds);
 
     qw0 = zeros(Float32, nw, nt)
     pw0 = ones(Float32, nw, nt)
@@ -73,7 +75,7 @@ function make_sim(grd, gdm_prop, well, prp, nt)
         for t=1:nt
             if uuf
                 uft = view(uf, :, t)
-                updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp)
+                updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp.*0)
                 cholesky!(ACL, -A)
                 updateCL!(CL, ACL)
             end
@@ -84,7 +86,7 @@ function make_sim(grd, gdm_prop, well, prp, nt)
 
             PM[:,t], pwc[:,t], pplc[:,t], qwc[:,t] = sim_step!(PM0, qcl, CL, bb,
                             nc,nw,Paq,T,well,
-                            view(uf,:,t),view(qw,:,t), view(pw,:,t),
+                            view(uf,:,t), view(qw,:,t), view(pw,:,t),
                             λbc, WI, wct, prp.eVp, tM, w1, w2)
             if fsw
                 bs[w1] .= view(bs, w1) .+ qcl
@@ -385,6 +387,37 @@ function make_gdm(;he_init = 1.,
     return grd, gdm_p, prp, x, nt
 end
 
+function make_gdmV(; he_init=1.0,
+                    kp_init=0.2,
+                    mp_init=0.2,
+                    nt_init=360,
+                    DD = DD, 
+                    bet=1e-4,
+                    Paq=20,
+                    λb=2.0)
+    #Создаём всё что надо
+    nc, nt = length(DD["p"]), nt_init
+
+    grd = (nc = nc, dl = DD["L"], ds = DD["B"],
+           X = DD["XY"][:,1], Y = DD["XY"][:,2], rc = DD["rc"], 
+           Sp = DD["Sp"], λbi = DD["bo_ind"])
+  
+    gdm_p = make_gdm_prop(bet0 = bet, Paq0 = Paq, λb0 = λb)
+
+    kp = kp_init*ones(Float32, grd_new.nc);
+    he = he_init*ones(Float32, grd_new.nc);
+    mp = mp_init*ones(Float32, grd_new.nc);
+
+    #Эффективный поровый объём ячеек (упругоёмкость)
+    eVp = gdm_p.bet.*he.*grd.Sp/gdm_p.dt;
+    #Поровый объём ячеек
+    Vp = he.*grd_new.Sp.*mp
+
+    prp = (kp = kp, he = he, mp = mp, eVp = eVp, Vp = Vp)
+
+    return grd, gdm_p, prp, nt
+end
+
 function make_well_grid(grd, a = 0.25, ncol = 3)
     #a - отступ от края
     #ncol - кол-во рядов
@@ -464,20 +497,21 @@ function makeB!(b, nx,nw,Pk,T,well,uf,qw,pw,λb,p0,WI, wct, eV=0)
     return nothing
 end
 
-function make_fun_AG(nc,rc,dx,ds)
+function make_fun_AG(nc,rc,dl,ds)
     r = view(rc,:,1);
     c = view(rc,:,2);
-    return make_fun_AG(nc,r,c,dx,ds)
+    return make_fun_AG(nc,r,c,dl,ds)
 end
 
-function make_fun_AG(nc,r,c,dx,ds)
+function make_fun_AG(nc,r,c,dl,ds)
     T = zeros(Float32, nc);
     Tr = view(T,r);
     Tc = view(T,c);
     AG = 2 .* T[r] .* T[c] ./ (T[r] .+ T[c]);
-    function makeAG(kp,h)
-        T.=kp.*h.*ds/dx;
+    function makeAG(kp, h)
+        T.= kp.*h;
         AG .= 2 .* Tr .* Tc ./ (Tr .+ Tc);
+        AG .= AG.*ds./dl
         return AG, T
     end
     return makeAG
