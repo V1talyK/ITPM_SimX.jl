@@ -389,7 +389,7 @@ function make_gdm(;he_init = 1.,
     mp = mp_init*ones(Float32, grd.nc);
 
     #Эффективный поровый объём ячеек (упругоёмкость)
-    eVp = gdm_p.bet.*he.*grd.Sp./gdm_p.dt;
+    eVp = gdm_p.bet.*he.*mp.*grd.Sp./gdm_p.dt;
     #Поровый объём ячеек
     Vp = he.*grd.Sp.*mp
 
