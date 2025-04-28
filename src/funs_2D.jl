@@ -355,7 +355,7 @@ function make_grid(nx,ny,Lx,Ly)
      irc = findall(.|(rc[:,1].<=nx,rc[:,1].>nx*(ny-1),mod.(rc[:,1],nx).==1,mod.(rc[:,1],ny).==0))
      λbi = sort(unique(rc[irc,1]))
 
-     return (nc = nc, dl=dl, ds=ds, Sp = Sp, X = X, Y=Y, rc = rc, λbi=λbi)
+     return (nc = nc, nc0 = nc, dl=dl, ds=ds, Sp = Sp, X = X, Y=Y, rc = rc, λbi=λbi)
 end
 
 function make_rc(nx,ny)
@@ -644,4 +644,62 @@ function make_M2W(grd, well)
     end
     M2W = sparse(w1g, w2g, vg, nc, nw)
     return M2W
+end
+
+function aq_extend(grd, gdm_p, prp; prm=Dict("nor" => 1,
+                                             "lat" => 1,
+                                             "vol" => 1))
+    #Расширяем численным аквифером
+    nc = grd.nc + length(grd.λbi)
+    ni = grd.nc+1:nc
+    rc_bi = vcat(hcat(grd.nc+1:nc, grd.λbi), hcat(grd.λbi, grd.nc+1:nc))
+
+    r_bb = zeros(Int64, 0)
+    c_bb = zeros(Int64, 0)
+    dl_bb = zeros(Float32, 0)
+    ds_lrbb = zeros(Float32, 0)
+    ds_bb = zeros(Float32, 0)
+
+    for (k, ic) in enumerate(grd.λbi)
+        ia = findall(isequal(ic), view(grd.rc, :, 1))
+        ib = view(grd.rc, ia, 2)
+        ib1 = filter(!isnothing, indexin(ib, grd.λbi))
+        dl_ic = grd.dl[ia][.!isnothing.(indexin(ib, grd.λbi))]
+        ds_ic = grd.ds[ia][.!isnothing.(indexin(ib, grd.λbi))]
+        k1 = 0
+        ds = 0.0
+        for i in ib1
+            k1 += 1
+            push!(r_bb, ni[k])
+            push!(c_bb, ni[i])
+            push!(dl_bb, dl_ic[k1])
+            push!(ds_lrbb, ds_ic[k1])
+            ds += dl_ic[k1]
+        end
+        push!(ds_bb, ds / 2)
+    end
+    rc = vcat(grd.rc, hcat(r_bb, c_bb), rc_bi)
+
+    lr = sqrt.(grd.Sp[grd.λbi]./pi)
+    dl = vcat(grd.dl, dl_bb, prm["nor"]*vcat(lr,lr)*2)
+    ds = vcat(grd.ds, prm["lat"].*ds_lrbb, ds_bb, ds_bb)
+    Sp = vcat(grd.Sp, prm["vol"] .* grd.Sp[grd.λbi])
+    new_grd = (nc=nc, nc0 = grd.nc, dl=dl, ds=ds, Sp=Sp, X=grd.X, Y=grd.Y, rc=rc, λbi=collect(ni),
+        dl_bi=length(grd.dl) .+ length(dl_bb) .+ (1: length(ni)*2),
+        ds_bi=length(grd.ds) .+ (1:length(dl_bb)),
+        Sp_bi=collect(ni))
+
+    #Эффективный поровый объём ячеек (упругоёмкость)
+    he = vcat(prp.he, prp.he[grd.λbi])
+    mp = vcat(prp.mp, prp.mp[grd.λbi])
+    eVp = gdm_p.bet .* he .* mp .* new_grd.Sp ./ gdm_p.dt
+    #Поровый объём ячеек
+    Vp = he .* new_grd.Sp .* mp
+    new_prp = (kp=vcat(prp.kp, prp.kp[grd.λbi]),
+        he=he,
+        mp=mp,
+        eVp=eVp,
+        Vp=Vp)
+
+    return new_grd, new_prp
 end
