@@ -699,7 +699,8 @@ function aq_extend(grd, gdm_p, prp; prm=Dict("nor" => 1,
         he=he,
         mp=mp,
         eVp=eVp,
-        Vp=Vp)
+        Vp=Vp, 
+        Vp_ca=view(Vp,1:grd.nc))
 
     return new_grd, new_prp
 end
