@@ -41,17 +41,18 @@ prp.kp[.&(3*grd.X.+grd.Y.>3100,
 
 #UnicodePlots.heatmap(reshape(prp.kp, grd.nx, grd.ny)')|>println
 wxy = getindex.(wxy13,2)
-plt = plot_map_and_well(range(0, 2500, grd.nx),
-                  range(0, 2500, grd.ny),
-                  reshape(prp.kp, grd.nx, grd.ny)', wxy, [iw_prod, iw_inj], ["Доб.", "Наг."],
-                  [:circle, :dtriangle])
-Plots.annotate!(plt, getindex.(wxy,1).+120, getindex.(wxy,2).-50, text.(string.("№", 1:nw),12))
+plt = plot_map(range(0, 2500, floor(Int64, sqrt(grd.nc0))), range(0, 2500, floor(Int64, sqrt(grd.nc0))),
+              reshape(prp.kp, floor(Int64, sqrt(grd.nc0)), floor(Int64, sqrt(grd.nc0)))';
+              minv = 0.0,
+              cbTitle = "Проницаемость, мД.",)
+add_well!(plt,  wxy, [iw_prod, iw_inj], ["Доб.", "Наг."], [:circle, :dtriangle])
+add_wn!(plt, wxy)
 
 pth = joinpath(Base.source_dir(),"map_13w")
 Plots.savefig(pth)
 Plots.svg(pth)
 
-sim_calc, cIWC = make_sim(grd,gdm_prop, well, prp, nt)
+sim_calc, cIWC = make_sim(grd, gdm_prop, well, prp, nt)
 qw = rand(-1:0.1:1, nw, nt);
 qw, _uf = SimScriptTool.gen_real_rand_qw(nw, nt; mult = 1.0)
 qw .= abs.(qw)
