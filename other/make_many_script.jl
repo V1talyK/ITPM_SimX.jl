@@ -142,9 +142,14 @@ while flag
   k+=1
   rsl = sim_calc(qw = qw, uf = uf, pw = pw)
   ia = findall(rsl.pw.<0.05)
+  ib = findall(rsl.pw.>25)
   flag = (&)(k<10, length(ia)>0)
   if flag
     qw[ia] .*=0.7
+  end
+  flag = (&)(k<10, length(ib)>0)
+  if flag
+    qw[ib] .*=0.7
   end
   println(length(ia))
 end

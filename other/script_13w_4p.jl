@@ -1,5 +1,6 @@
 using ITPM_SimX
 using Plots, SimScriptTool, UnicodePlots
+using StatsBase
 using plotlibs
 
 tag = "13w_p4"
@@ -13,11 +14,11 @@ grd, gdm_prop, prp, xy, nt = make_gdm(;he_init = 10.,
                                      Ly_init = 2500,
                                      bet = 5e-4,
                                      Paq = 10,
-                                     λb = 0.02)
+                                     λb = 0.01)
 
-grd, prp = aq_extend(grd, gdm_prop, prp; prm=Dict("nor" => 1,
+grd, prp = aq_extend(grd, gdm_prop, prp; prm=Dict("nor" => 1e6,
             "lat" => 1,
-            "vol" => 200))
+            "vol" => 100))
 
 
 x = make_well_grid(2500, 0.25, 5)
@@ -42,8 +43,8 @@ kp_fld[.&(3*grd.X.+grd.Y.>3500,
           3*grd.X.+grd.Y.<4100,
           grd.X.>150.0,
           grd.X.<2250.0,
-          grd.Y.>150.0,
-          grd.Y.<2250.0)] .*= 4
+          grd.Y.>750.0,
+          grd.Y.<2000.0)] .*= 4
 
 kp_fld[.&(grd.X .> 1400.0,
           grd.X .< 2250.0,
@@ -63,7 +64,7 @@ pth = joinpath(Base.source_dir(),"map_$tag")
 Plots.savefig(pth)
 Plots.svg(pth)
 
-sim_calc, cIWC = make_sim(grd, gdm_prop, well, prp, nt)
+sim_calc, cIWC = make_sim(grd, gdm_prop, well, prp, nt);
 qw = rand(-1:0.1:1, nw, nt);
 qw, _uf = SimScriptTool.gen_real_rand_qw(nw, nt; mult = 1.0)
 qw .= abs.(qw)
@@ -137,7 +138,7 @@ plot(qw[iw_inj,:]')
 plot(qw[iw_prod,:]')
 using StatsBase
 plot(mean(rsl.ppl, dims =1)[:], ylims = (0, 12))
-plot(mean(rsl.PM[grd.nc0+1:end,:], dims =1)[:], ylims = (0, 12))
+plot!(mean(rsl.PM[grd.nc0+1:end,:], dims =1)[:], ylims = (0, 12))
 
 plt = plot()
   plt2 = plot()
