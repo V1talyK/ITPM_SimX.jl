@@ -1,7 +1,19 @@
-using ITPM_SimX
+#using Pkg
+#Pkg.add(path = "https://github.com/V1talyK/ITPM_SimX.jl")
+#Pkg.add(path = "https://gitverse.ru/sc/lik/SimScriptTool.jl.git")
+#Pkg.add(path = "ssh://git@gitverse.ru:2222/lik/plotlibs.git")
+#using ITPM_SimX
 using Plots, SimScriptTool, UnicodePlots
 using StatsBase
 using plotlibs
+
+using NearestNeighbors, LinearAlgebra, SparseArrays, SuiteSparse
+
+include("../src/libs.jl")
+include("../src/funs_2D.jl")
+include("../src/funs_sat.jl")
+include("../src/linAlgLib.jl")
+
 
 tag = "13w_p4"
 grd, gdm_prop, prp, xy, nt = make_gdm(;he_init = 10.,
