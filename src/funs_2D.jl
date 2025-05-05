@@ -38,10 +38,12 @@ function make_sim(grd, gdm_prop, well, prp, nt)
     actW = trues(nw,nt)
     ufl = falses(nw,nt)
 
-    WI = 2*pi./fill(log(0.14*sqrt(2)*grd.dx/0.05),nwc)
+    Rp = 0.14*sqrt.(2 .*grd.Sp[w1]);
+    WI = 2*pi./log.(Rp./0.05)
+
     A, W1 = makeA(view(rc,:,1),view(rc,:,2),nc,nw,w1,w2)
     AS = sparse(view(rc,:,1),view(rc,:,2),1.0,nc,nc)
-    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dx,grd.ds);
+    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dl,grd.ds);
 
     qw0 = zeros(Float32, nw, nt)
     pw0 = ones(Float32, nw, nt)
@@ -49,19 +51,23 @@ function make_sim(grd, gdm_prop, well, prp, nt)
     uf0 = falses(nw, nt)
     kp0 = prp.kp
     he0 = prp.he
+    flag_stop_well0 = false; #Флаг на моделирование остановки скважин
 
-
-    function msim(; qw = qw0, pw = pw0, kp = kp0, he = he0, uf = uf0, wc = wc0)
+    function msim(; qw = qw0, pw = pw0, kp = kp0, he = he0, uf = uf0, wc = wc0, fsw = flag_stop_well0)
         GM.=kp.*he.*10. *8.64*1e-3;
         AG, T = makeAG(kp.*10. *8.64*1e-3,he)
         wct = view(wc, w2, 1)
         uft = view(uf, :, 1)
         updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp)
-        updAS!(AS,AG,view(rc,:,1),view(rc,:,2),nc,T,λbc,prp.eVp)
         ACL = cholesky(-A)
-        ACLS = cholesky(-AS)
         CL = make_CL_in_julia(ACL, Threads.nthreads())
         updateCL!(CL, ACL)
+
+        updAS!(AS,AG,view(rc,:,1),view(rc,:,2),nc,T,λbc,prp.eVp)
+        ACLS = cholesky(-AS)
+        CLS = make_CL_in_julia(ACLS, Threads.nthreads())
+        updateCL!(CLS, ACLS)
+
         PM0 .= P0
         AM = transpose(convert(Array{Float32,2}, ACL\tM.M2Mw))
         uuf = !all(allunique.(eachrow(uf)))
@@ -71,26 +77,27 @@ function make_sim(grd, gdm_prop, well, prp, nt)
                 uft = view(uf, :, t)
                 updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp)
                 cholesky!(ACL, -A)
-                CL = make_CL_in_julia(ACL, Threads.nthreads())
                 updateCL!(CL, ACL)
             end
 
             wct = view(wc, w2, t)
             bs.=0f0;
-            bs .= bs .- T.*λbc*Paq .- prp.eVp.*view(PM0, 1:nc)
+            bs .= bs .- T.*λbc*Paq .- prp.eVp.*view(PM0, 1:nc);
 
-            PM[:,t], pwc[:,t], pplc[:,t], qwc[:,t] = sim_step!(PM0, qcl, ACL, bb,
+            PM[:,t], pwc[:,t], pplc[:,t], qwc[:,t] = sim_step!(PM0, qcl, CL, bb,
                             nc,nw,Paq,T,well,
-                            view(uf,:,t),view(qw,:,t), view(pw,:,t),
+                            view(uf,:,t), view(qw,:,t), view(pw,:,t),
                             λbc, WI, wct, prp.eVp, tM, w1, w2)
-
-            bs[w1] .= view(bs, w1) .+ qcl
-            for iw = 1:nw
-                fl = w2.==iw
-                bs[w1[fl]] -= qcl[fl]
-                PMs .= ACLS\bs
-                ppls[iw,t] = - sum(view(PMs, w1[fl]))/count(fl)
-                bs[w1[fl]]  += qcl[fl]
+            if fsw
+                bs[w1] .= view(bs, w1) .+ qcl
+                for iw = 1:nw
+                    fl = w2.==iw
+                    bs[w1[fl]] -= qcl[fl]
+                    #PMs .= ACLS\bs
+                    back_slash_slvr!(PMs, CLS, bs)
+                    ppls[iw,t] = - sum(view(PMs, w1[fl]))/count(fl)
+                    bs[w1[fl]]  += qcl[fl]
+                end
             end
             ppla[:,t] .= tM.W2Ma*view(PM0,1:nc)
         end
@@ -108,8 +115,8 @@ function make_sim(grd, gdm_prop, well, prp, nt)
         uft = view(uf, :, 1)
         updA!(A,W1,AG,view(rc,:,1),view(rc,:,2),nc,nw,T,λbc,w1,w2,GM,WI,wct,uft,prp.eVp)
         ACL = cholesky(-A)
-        CL = make_CL_in_julia(ACL, Threads.nthreads())
-        updateCL!(CL, ACL)
+        # CL = make_CL_in_julia(ACL, Threads.nthreads())
+        # updateCL!(CL, ACL)
         PM0 .= P0
         AM = transpose(convert(Array{Float32,2}, ACL\tM.M2Mw))
         rAdf, rBdf = make_reduce_ma3x_dims(A, w1, w2, nc)
@@ -136,16 +143,17 @@ function sim_step!(PM0, qcl, ACL, bb, nc,nw,Paq,T,well,uft,qwt,pwt,λbc,
 
     makeB!(bb, nc,nw,Paq,T,well,uft,qwt,pwt,λbc, view(PM0,1:nc), WI, wct, eVp);
 
-    PM0 .= ACL\bb;
+    #PM0 .= ACL\bb;
+    back_slash_slvr!(PM0, ACL, bb)
     PM0 .= .-PM0
     pwc = view(PM0,nc+1:nc+nw)
     pplc = tM.M2M*view(PM0,1:nc);
-    qcl .= WI.*view(T,w1).*(view(PM0,w1).-pwt[w2]).*wct
+    qcl .= WI.*view(T,w1).*(view(PM0,w1).-view(pwt,w2)).*wct
     qwc = accumarray(w2, qcl, nw)
     nuft = .!uft
     qwc[nuft] .= qwt[nuft]
     pwc[uft] .= pwt[uft]
-    qcl .= WI.*view(T,w1).*(view(PM0,w1).-pwc[w2]).*wct
+    qcl .= WI.*view(T,w1).*(view(PM0,w1).-view(pwc,w2)).*wct
     #println(sum(abs,pplcBt.-temp_ppl))
     return PM0, pwc, pplc, qwc
 end
@@ -193,11 +201,12 @@ function make_sim2f(grd, gdm_prop, well, prp, nt, satc)
     tM = (M2M = sparse(w2,w1,dw,nw,nc),
           M2Mw = sparse(w1,w2,1,nc+nw,nw))
     actW = trues(nw,nt)
-    ufl = falses(nw,nt)
-
-    WI = 2*pi./fill(log(0.14*sqrt(2)*grd.dx/0.05),nwc)
+    
+    Rp= 0.14*sqrt.(2 .*grd.Sp[w1]);
+    WI = 2*pi./log.(Rp./0.05)
+    
     A, W1 = makeA(view(rc,:,1),view(rc,:,2),nc,nw,w1,w2)
-    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dx,grd.ds);
+    makeAG = make_fun_AG(grd.nc,grd.rc,grd.dl,grd.ds);
 
     qw0 = zeros(Float32, nw, nt)
     pw0 = ones(Float32, nw, nt)
@@ -332,10 +341,21 @@ function make_grid(nx,ny,Lx,Ly)
      Y = getindex.(XY,2)
      rc = make_rc(nx,ny);
 
+     dx = view(X,view(rc,:,1)).-view(X,view(rc,:,2))
+     dy = view(Y,view(rc,:,1)).-view(Y,view(rc,:,2))
+     dl = sqrt.(dx.^2 + dy.^2);
+    
+     ds = zeros(Float32, length(dl))
+     ds[dx.==0] .= step(xr)
+     ds[dy.==0] .= step(yr)
+
+     Sp = zeros(Float32, nc)
+     Sp .= step(xr)*step(yr)
+
      irc = findall(.|(rc[:,1].<=nx,rc[:,1].>nx*(ny-1),mod.(rc[:,1],nx).==1,mod.(rc[:,1],ny).==0))
      λbi = sort(unique(rc[irc,1]))
 
-     return (nc = nc, nx = nx, ny = ny, dx=dx, ds=ds, X = X, Y=Y, rc = rc, λbi=λbi)
+     return (nc = nc, nc0 = nc, dl=dl, ds=ds, Sp = Sp, X = X, Y=Y, rc = rc, λbi=λbi)
 end
 
 function make_rc(nx,ny)
@@ -364,26 +384,58 @@ function make_gdm(;he_init = 1.,
     grd = make_grid(nx,ny,Lx,Ly); #кол-во ячеек x, кол-во ячеек y, размер X, размер Y
     gdm_p = make_gdm_prop(bet0 = bet, Paq0 = Paq, λb0 = λb)
 
-    kp = kp_init*ones(grd.nx,grd.ny);   kp = kp[:];
-    he = he_init*ones(grd.nx,grd.ny);    he = he[:];
-    mp = mp_init*ones(grd.nx,grd.ny);    mp = mp[:];
+    kp = kp_init*ones(Float32, grd.nc);
+    he = he_init*ones(Float32, grd.nc);
+    mp = mp_init*ones(Float32, grd.nc);
 
     #Эффективный поровый объём ячеек (упругоёмкость)
-    eVp = gdm_p.bet.*he.*grd.ds.*grd.ds/gdm_p.dt;
+    eVp = gdm_p.bet.*he.*mp.*grd.Sp./gdm_p.dt;
     #Поровый объём ячеек
-    Vp = he.*grd.ds.*grd.ds.*mp
+    Vp = he.*grd.Sp.*mp
 
     prp = (kp = kp, he = he, mp = mp, eVp = eVp, Vp = Vp)
 
-    x = make_well_grid(grd, 0.2, 3)
-    return grd, gdm_p, prp, x, nt
+    x = make_well_grid(Lx, 0.2, 3)
+    y = make_well_grid(Ly, 0.2, 3)
+    return grd, gdm_p, prp, (x, y), nt
 end
 
-function make_well_grid(grd, a = 0.25, ncol = 3)
+function make_gdmV(; he_init=1.0,
+                    kp_init=0.2,
+                    mp_init=0.2,
+                    nt_init=360,
+                    DD = DD, 
+                    bet=1e-4,
+                    Paq=20,
+                    λb=2.0)
+    #Создаём всё что надо
+    nc, nt = length(DD["p"]), nt_init
+
+    grd = (nc = nc, dl = DD["L"], ds = DD["B"],
+           X = DD["XY"][:,1], Y = DD["XY"][:,2], rc = DD["rc"], 
+           Sp = DD["Sp"], λbi = DD["bo_ind"])
+  
+    gdm_p = make_gdm_prop(bet0 = bet, Paq0 = Paq, λb0 = λb)
+
+    kp = kp_init*ones(Float32, grd.nc);
+    he = he_init*ones(Float32, grd.nc);
+    mp = mp_init*ones(Float32, grd.nc);
+
+    #Эффективный поровый объём ячеек (упругоёмкость)
+    eVp = gdm_p.bet.*he.*grd.Sp/gdm_p.dt;
+    #Поровый объём ячеек
+    Vp = he.*grd.Sp.*mp
+
+    prp = (kp = kp, he = he, mp = mp, eVp = eVp, Vp = Vp)
+
+    return grd, gdm_p, prp, nt
+end
+
+function make_well_grid(L, a = 0.25, ncol = 3)
     #a - отступ от края
     #ncol - кол-во рядов
     stp = (1 - a*2)/(ncol-1)
-    x = range(grd.dx*grd.nx*a; length=ncol, step = grd.dx*grd.nx*stp)
+    x = range(L*a; length=ncol, step = L*stp)
     return x
 end
 function make_well(wxy,grd)
@@ -458,20 +510,21 @@ function makeB!(b, nx,nw,Pk,T,well,uf,qw,pw,λb,p0,WI, wct, eV=0)
     return nothing
 end
 
-function make_fun_AG(nc,rc,dx,ds)
+function make_fun_AG(nc,rc,dl,ds)
     r = view(rc,:,1);
     c = view(rc,:,2);
-    return make_fun_AG(nc,r,c,dx,ds)
+    return make_fun_AG(nc,r,c,dl,ds)
 end
 
-function make_fun_AG(nc,r,c,dx,ds)
+function make_fun_AG(nc,r,c,dl,ds)
     T = zeros(Float32, nc);
     Tr = view(T,r);
     Tc = view(T,c);
     AG = 2 .* T[r] .* T[c] ./ (T[r] .+ T[c]);
-    function makeAG(kp,h)
-        T.=kp.*h.*ds/dx;
+    function makeAG(kp, h)
+        T.= kp.*h;
         AG .= 2 .* Tr .* Tc ./ (Tr .+ Tc);
+        AG .= AG.*ds./dl
         return AG, T
     end
     return makeAG
@@ -487,9 +540,13 @@ function updA!(A,W1,AG,r,c,nx,nw,T,λb,w1,w2,GM, WI, wct, uft, eV=0)
     accumarray!(A2,r,AG)
     A2 .= A2 .+ T.*λb.+eV;
     WIg = WI.*view(GM,w1).*wct
-    A2[w1] .= A2[w1] .+ WIg
+    A2[w1] .= view(A2,w1) .+ WIg
     A2[w1[uft[w2]]] .= A2[w1[uft[w2]]] .+ WIg[uft[w2]]
+    #accumarray!(A3, w1[uft[w2]], A2[w1[uft[w2]]] .+ WIg[uft[w2]])
+    #A2.+=A3
+    #println(A[3700,:])
     updatesp!(A,1:nx,1:nx,.-A2)
+    #println(A[3700,:])
     accumarray!(W3, w2, WIg)
     updatesp!(A,nx+1:nx+nw,nx+1:nx+nw, -W3)
     updatesp!(A,w1,nx.+w2,WIg)
@@ -587,4 +644,63 @@ function make_M2W(grd, well)
     end
     M2W = sparse(w1g, w2g, vg, nc, nw)
     return M2W
+end
+
+function aq_extend(grd, gdm_p, prp; prm=Dict("nor" => 1,
+                                             "lat" => 1,
+                                             "vol" => 1))
+    #Расширяем численным аквифером
+    nc = grd.nc + length(grd.λbi)
+    ni = grd.nc+1:nc
+    rc_bi = vcat(hcat(grd.nc+1:nc, grd.λbi), hcat(grd.λbi, grd.nc+1:nc))
+
+    r_bb = zeros(Int64, 0)
+    c_bb = zeros(Int64, 0)
+    dl_bb = zeros(Float32, 0)
+    ds_lrbb = zeros(Float32, 0)
+    ds_bb = zeros(Float32, 0)
+
+    for (k, ic) in enumerate(grd.λbi)
+        ia = findall(isequal(ic), view(grd.rc, :, 1))
+        ib = view(grd.rc, ia, 2)
+        ib1 = filter(!isnothing, indexin(ib, grd.λbi))
+        dl_ic = grd.dl[ia][.!isnothing.(indexin(ib, grd.λbi))]
+        ds_ic = grd.ds[ia][.!isnothing.(indexin(ib, grd.λbi))]
+        k1 = 0
+        ds = 0.0
+        for i in ib1
+            k1 += 1
+            push!(r_bb, ni[k])
+            push!(c_bb, ni[i])
+            push!(dl_bb, dl_ic[k1])
+            push!(ds_lrbb, ds_ic[k1])
+            ds += dl_ic[k1]
+        end
+        push!(ds_bb, ds / 2)
+    end
+    rc = vcat(grd.rc, hcat(r_bb, c_bb), rc_bi)
+
+    lr = sqrt.(grd.Sp[grd.λbi]./pi)
+    dl = vcat(grd.dl, dl_bb, prm["nor"]*vcat(lr,lr)*2)
+    ds = vcat(grd.ds, prm["lat"].*ds_lrbb, ds_bb, ds_bb)
+    Sp = vcat(grd.Sp, prm["vol"] .* grd.Sp[grd.λbi])
+    new_grd = (nc=nc, nc0 = grd.nc, dl=dl, ds=ds, Sp=Sp, X=grd.X, Y=grd.Y, rc=rc, λbi=collect(ni),
+        dl_bi=length(grd.dl) .+ length(dl_bb) .+ (1: length(ni)*2),
+        ds_bi=length(grd.ds) .+ (1:length(dl_bb)),
+        Sp_bi=collect(ni))
+
+    #Эффективный поровый объём ячеек (упругоёмкость)
+    he = vcat(prp.he, prp.he[grd.λbi])
+    mp = vcat(prp.mp, prp.mp[grd.λbi])
+    eVp = gdm_p.bet .* he .* mp .* new_grd.Sp ./ gdm_p.dt
+    #Поровый объём ячеек
+    Vp = he .* new_grd.Sp .* mp
+    new_prp = (kp=vcat(prp.kp, prp.kp[grd.λbi]),
+        he=he,
+        mp=mp,
+        eVp=eVp,
+        Vp=Vp, 
+        Vp_ca=view(Vp,1:grd.nc))
+
+    return new_grd, new_prp
 end
