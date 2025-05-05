@@ -28,7 +28,7 @@ grd, gdm_prop, prp, xy, nt = make_gdm(;he_init = 10.,
                                      Paq = 10,
                                      λb = 0.01)
 
-grd, prp = aq_extend(grd, gdm_prop, prp; prm=Dict("nor" => 1e6,
+grd, prp = aq_extend(grd, gdm_prop, prp; prm=Dict("nor" => 1e3,
             "lat" => 1,
             "vol" => 100))
 
