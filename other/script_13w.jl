@@ -164,12 +164,12 @@ gdm_sat = make_gdm_prop_sat(mu_o = 10.0f0, n_o = 2, n_w = 2)
 satf = calc_sat_step(prp, grd, gdm_prop, gdm_sat, well, nt)
     sim_calc, cIWf = make_sim2f(grd, gdm_prop, well, prp, nt, satf)
 
-rsl = sim_calc(qw = qw, uf = uf, pw = pw)
+rsl = sim_calc(qw = qw, uf = uf, pw = pw);
 w2w, _ = cIWf(qw=qw)
 wtc = calc_wtc(rsl.SW, gdm_sat.fkrp, well);
 wtc[rsl.qw .< 0.0] .= 0.0;
 qo = rsl.qw.*(1 .- wtc);  qo[rsl.qw .< 0.0] .= 0.0;
-iw = 13
+iw = 11
   plt = plot(qw[iw,:], label = "жид.")
   plt_twin = twinx(plt);
   plot!(plt, qo[iw,:], label = "нефть.")
