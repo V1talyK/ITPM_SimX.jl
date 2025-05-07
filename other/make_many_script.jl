@@ -71,6 +71,32 @@ function make_dsp(nw, rsl)
     return dsp
 end
 
+function fix_qw(qw, uf, pw)
+  flag = true
+  k = 0
+  kmax = 20;
+  while flag
+    k += 1
+    rsl = sim_calc(qw=qw, uf=uf, pw=pw)
+    ia = findall(rsl.pw .< 0.05)
+    ib = findall(rsl.pw .> 25)
+    flag1 = (&)(k < kmax, length(ia) > 0)
+    if flag1
+      tmp = 0.05.-rsl.pw[ia];
+      max_er_pw = maximum(tmp);
+      alp = tmp./max_er_pw;
+      qw[ia] .*= 1.0 .- 0.3.*alp
+    end
+    flag2 = (&)(k < kmax, length(ib) > 0)
+    if flag2
+      qw[ib] .*= 0.9
+    end
+    println(length(ia))
+    flag = flag1 | flag2
+  end
+  return qw
+end
+
 sim_calc, cIWC = make_sim(grd, gdm_prop, well, prp, nt);
 
 tag = "s0.1"
@@ -83,26 +109,22 @@ pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 12
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
-qw .= mean(qw, dims = 2)
+qw = fix_qw(qw, uf, pw);
+qw .= mean(qw, dims = 2);
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
 
 tag = "s0.2"
+for (k,v) in enumerate(zip(Iterators.partition(169:nt,floor(Int64, (nt-168)/nw)), Iterators.cycle(1:nw)))
+    #println(k," ",v)
+    qw[v[2],v[1]] .*= 0.5;
+end
+rsl = sim_calc(qw = qw, uf = uf, pw = pw)
+save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
+sum(make_dsp(nw, rsl))
+
+tag = "s0.3"
 qw = ones(Float32, nw, nt);
 #qw, _uf = SimScriptTool.gen_real_rand_qw(nw, nt; mult = 1.0)
 #qw[iw_inj,:] .*= -1
@@ -110,52 +132,33 @@ qw = SimScriptTool.scaleRateByGeoProp(qw, prp.Vp, prp.kp, prp.he, gdm_prop.dt, g
 
 pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw);
 qw .= mean(qw, dims = 2).*0.95
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
+
+
+tag = "s0.4"
+for (k,v) in enumerate(zip(Iterators.partition(169:nt,floor(Int64, (nt-168)/nw)), Iterators.cycle(1:nw)))
+  #println(k," ",v)
+  qw[v[2],v[1]] .*= 0.5;
+end
+rsl = sim_calc(qw = qw, uf = uf, pw = pw)
+save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
+sum(make_dsp(nw, rsl))
+
 
 tag = "s1.1"
 qw = ones(Float32, nw, nt);
 qw, _uf = SimScriptTool.gen_real_rand_qw(nw, nt; mult = 1.0)
 qw[iw_inj,:] .*= -1
 qw = SimScriptTool.scaleRateByGeoProp(qw, prp.Vp, prp.kp, prp.he, gdm_prop.dt, gdm_prop.P0, grd.ds)
-
 pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 14
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  ib = findall(rsl.pw.>25)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  flag = (&)(k<10, length(ib)>0)
-  if flag
-    qw[ib] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw)
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
@@ -170,24 +173,10 @@ pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 14
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw)
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
-
-
 
 tag = "s1.3"
 qw = SimScriptTool.gen_periodic(nw, nt, cnt = 5)
@@ -198,19 +187,7 @@ pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 14
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw)
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
@@ -227,19 +204,7 @@ pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 14
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw)
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
@@ -255,24 +220,15 @@ pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 12
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw)
 qw .= mean(qw, dims = 2)
-for (k, v) in enumerate(Iterators.partition(1:nt,ceil(Int64,nt/nw)))
-  qw[k,v] .= 0f0; 
-  uf[k,v] .= false;
+for (k, v) in enumerate(zip(Iterators.partition(1:nt, ceil(Int64, 168/nw)), Iterators.cycle(1:nw)))
+  #enumerate(Iterators.partition(1:nt,ceil(Int64,nt/nw)))
+  #println(v)
+  qw[v[2],v[1]] .= 0f0; 
+  uf[v[2],v[1]] .= false;
 end
+qw = fix_qw(qw, uf, pw)
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
@@ -289,23 +245,11 @@ pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
 uf[iw_inj,:] .= true
 pw[iw_inj,:] .= 12
-
-flag = true;
-k = 0
-while flag
-  k+=1
-  rsl = sim_calc(qw = qw, uf = uf, pw = pw)
-  ia = findall(rsl.pw.<0.05)
-  flag = (&)(k<10, length(ia)>0)
-  if flag
-    qw[ia] .*=0.7
-  end
-  println(length(ia))
-end
+qw = fix_qw(qw, uf, pw)
 qw .= mean(qw, dims = 2)
-for (k, v) in enumerate(Iterators.partition(1:nt,ceil(Int64,nt/nw)))
-  qw[k,v] .*= 0.5f0; 
-  uf[k,v] .= false;
+for (k, v) in enumerate(zip(Iterators.partition(1:nt, ceil(Int64, 168/nw)), Iterators.cycle(1:nw)))
+  qw[v[2],v[1]] .*= 0.5f0; 
+  qw[v[2],v[1]] .= false;
 end
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 
