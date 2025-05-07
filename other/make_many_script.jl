@@ -5,7 +5,7 @@ function save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
         for t = 1:nt
             qp = ifelse(rsl.qw[iw,t] >= 0.0, rsl.qw[iw,t], 0.0)
             qi = ifelse(rsl.qw[iw,t] <= 0.0, rsl.qw[iw,t], 0.0)
-            qo = ifelse(rsl.qw[iw,t] <= 0.0, rsl.qw[iw,t], 0.0)
+            qo = ifelse(rsl.qw[iw,t] >= 0.0, rsl.qw[iw,t], 0.0)
             opra_i = qi > 0.0
             opra_p = qp > 0.0
             tmp = Vector{Any}(undef, 0)
@@ -23,7 +23,7 @@ function save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
                "wxy"=>wxy,
                "wkp"=>prp.kp[getindex.(well,1)],
                "whe"=>prp.he[getindex.(well,1)],
-               "kp"=>round.(prp.mp, sigdigits=3),
+               "kp"=>round.(prp.kp, sigdigits=3),
                "he"=>round.(prp.he, sigdigits=3),
                "mp"=>round.(prp.mp, sigdigits=3),
                "prop"=>gdm_prop,
