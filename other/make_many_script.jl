@@ -97,6 +97,9 @@ function fix_qw(qw, uf, pw)
   return qw
 end
 
+pltsrs(1:nt, eachrow(rsl.ppl))
+pltsrs(1:nt, eachrow(rsl.qw))
+
 sim_calc, cIWC = make_sim(grd, gdm_prop, well, prp, nt);
 
 tag = "s0.1"

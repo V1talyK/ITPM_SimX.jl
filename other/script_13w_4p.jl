@@ -1,11 +1,11 @@
 #using Pkg
 #Pkg.add(path = "https://github.com/V1talyK/ITPM_SimX.jl")
 #Pkg.add(path = "https://gitverse.ru/sc/lik/SimScriptTool.jl.git")
-#Pkg.add(path = "ssh://git@gitverse.ru:2222/lik/plotlibs.git")
+#Pkg.add(path = "ssh://git@gitverse.ru:2222/lik/PlotlibsTemplate.git")
 #using ITPM_SimX
 using Plots, SimScriptTool, UnicodePlots
 using StatsBase
-using plotlibs
+using PlotlibsTemplate
 
 using NearestNeighbors, LinearAlgebra, SparseArrays, SuiteSparse
 
@@ -26,11 +26,11 @@ grd, gdm_prop, prp, xy, nt = make_gdm(;he_init = 10.,
                                      Ly_init = 2500,
                                      bet = 5e-4,
                                      Paq = 10,
-                                     λb = 0.01)
+                                     λb = 0.001)
 
 grd, prp = aq_extend(grd, gdm_prop, prp; prm=Dict("nor" => 1e3,
             "lat" => 1,
-            "vol" => 100))
+            "vol" => 10))
 
 
 x = make_well_grid(2500, 0.25, 5)
