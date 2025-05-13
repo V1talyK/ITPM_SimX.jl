@@ -45,11 +45,22 @@ kp_fld = view(prp.kp,1:grd.nc0)
 
 kp_fld[.&(abs.((grd.X[well[2][1]]+grd.X[well[4][1]])/2 .- grd.X).<20,
         (grd.Y[well[10][1]]+grd.Y[well[6][1]])/2 .<=grd.Y,
+        grd.Y[well[12][1]] .+ 250 .>=grd.Y,
+        (grd.Y[well[12][1]]+grd.Y[well[11][1]])/2 + 600 .>=grd.Y)] .*= 0.01
+
+
+kp_fld[.&(abs.(grd.X[well[13][1]] .+ 250 .- grd.X).<20,
+        (grd.Y[well[10][1]]+grd.Y[well[6][1]])/2 .<=grd.Y,
+        grd.Y[well[12][1]] .+ 250 .>=grd.Y,
         (grd.Y[well[12][1]]+grd.Y[well[11][1]])/2 + 600 .>=grd.Y)] .*= 0.01
 
 kp_fld[.&((grd.X[well[2][1]]+grd.X[well[4][1]])/2 .< grd.X,
-        abs.((grd.Y[well[10][1]]+grd.Y[well[6][1]])/2 .- grd.Y).<20)] .*= 0.01
+        abs.((grd.Y[well[10][1]]+grd.Y[well[6][1]])/2 .- grd.Y).<20,
+        grd.X[well[13][1]] .+ 250 .>=grd.X)] .*= 0.01
 
+kp_fld[.&((grd.X[well[2][1]]+grd.X[well[4][1]])/2 .< grd.X,
+        abs.((grd.Y[well[10][1]]+grd.Y[well[6][1]])/2 .+ 750 .- grd.Y).<20,
+        grd.X[well[13][1]] .+ 250 .>=grd.X)] .*= 0.01
 
 kp_fld[.&(3*grd.X.+grd.Y.>3500,
           3*grd.X.+grd.Y.<4100,
