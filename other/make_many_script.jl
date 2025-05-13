@@ -38,6 +38,7 @@ end
 
 function make_dsp(nw, rsl)
     dsp = zeros(nw)
+    nt = size(rsl.qw, 2)
     for iw = 1:nw
         qwi = rsl.qw[iw, :]
         mima = maximum(qwi) .- minimum(qwi)
@@ -146,6 +147,9 @@ tag = "s0.4"
 for (k,v) in enumerate(zip(Iterators.partition(169:nt,floor(Int64, (nt-168)/nw)), Iterators.cycle(1:nw)))
   #println(k," ",v)
   qw[v[2],v[1]] .*= 0.5;
+  if v[2] in iw_inj
+    qw[v[2],v[1][1]:end] .*=-1
+  end
 end
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
