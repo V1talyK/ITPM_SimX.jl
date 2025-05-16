@@ -209,9 +209,12 @@ qw = SimScriptTool.scaleRateByGeoProp(qw, prp.Vp, prp.kp, prp.he, gdm_prop.dt, g
 
 pw = 2*ones(nw, nt);
 uf =  falses(nw, nt);
-uf[iw_inj,:] .= true
+ufi = view(uf, iw_inj,:);
+ufi .= true
+ufi[.!fl[iw_inj,1:nt]].=false;
 pw[iw_inj,:] .= 14
 qw = fix_qw(qw, uf, pw)
+view(qw, iw_inj,:)[.!fl[iw_inj,1:nt]] .= 0;
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 save_rgm2file(tag, rsl, grd, prp, gdm_prop, wxy)
 sum(make_dsp(nw, rsl))
@@ -256,7 +259,7 @@ qw = fix_qw(qw, uf, pw)
 qw .= mean(qw, dims = 2)
 for (k, v) in enumerate(zip(Iterators.partition(1:nt, ceil(Int64, 168/nw)), Iterators.cycle(1:nw)))
   qw[v[2],v[1]] .*= 0.5f0; 
-  qw[v[2],v[1]] .= false;
+  uf[v[2],v[1]] .= false;
 end
 rsl = sim_calc(qw = qw, uf = uf, pw = pw)
 
