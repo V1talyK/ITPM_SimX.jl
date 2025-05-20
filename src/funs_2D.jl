@@ -684,7 +684,8 @@ function aq_extend(grd, gdm_p, prp; prm=Dict("nor" => 1,
     dl = vcat(grd.dl, dl_bb, prm["nor"]*vcat(lr,lr)*2)
     ds = vcat(grd.ds, prm["lat"].*ds_lrbb, ds_bb, ds_bb)
     Sp = vcat(grd.Sp, prm["vol"] .* grd.Sp[grd.λbi])
-    new_grd = (nc=nc, nc0 = grd.nc, dl=dl, ds=ds, Sp=Sp, X=grd.X, Y=grd.Y, rc=rc, λbi=collect(ni),
+    new_grd = (nc=nc, nc0 = grd.nc, dl=dl, ds=ds, Sp=Sp, X=grd.X, Y=grd.Y, rc=rc,
+        λbi=collect(ni), λbi0 = grd.λbi,
         dl_bi=length(grd.dl) .+ length(dl_bb) .+ (1: length(ni)*2),
         ds_bi=length(grd.ds) .+ (1:length(dl_bb)),
         Sp_bi=collect(ni))
